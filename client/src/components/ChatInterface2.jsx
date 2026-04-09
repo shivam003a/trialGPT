@@ -1,9 +1,6 @@
-import React, { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useState } from "react";
 
-function ChatInterface() {
+function ChatInterface2() {
     const [messages, setMessages] = useState([]);
     const [query, setQuery] = useState("");
 
@@ -13,19 +10,22 @@ function ChatInterface() {
         if (!query.trim()) return;
 
         const newMessages = [...messages, { role: "user", content: query }];
-        setMessages(newMessages);
+        setMessages([...newMessages, { role: "assistant", content: "" }]);
         setQuery("");
 
         try {
-            const res = await fetch("http://localhost:5000/api/chat/message", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
+            const res = await fetch(
+                "http://localhost:5000/api/chat/message/s",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        messages: newMessages,
+                    }),
                 },
-                body: JSON.stringify({
-                    messages: newMessages,
-                }),
-            });
+            );
 
             let result = "";
 
@@ -33,11 +33,14 @@ function ChatInterface() {
             const decoder = new TextDecoder("utf-8");
             let buffer = "";
 
+            let i = 0;
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
+
                 const lines = chunk.split("\n");
 
                 for (let line of lines) {
@@ -53,15 +56,18 @@ function ChatInterface() {
 
                         if (text) {
                             result += text;
+                            // TODO: update code for proper rendering
+                            setMessages((prev) => {
+                                const updated = [...prev];
+                                updated[updated.length - 1] = {
+                                    role: "assistant",
+                                    content: result,
+                                };
+                                return updated;
+                            });
                         }
                     } catch (e) {}
                 }
-            }
-            if (result) {
-                setMessages((prev) => [
-                    ...prev,
-                    { role: "assistant", content: result },
-                ]);
             }
         } catch (e) {
             console.log("Something Went Wrong", e);
@@ -70,12 +76,17 @@ function ChatInterface() {
 
     return (
         <div className="overflow-hidden! w-screen flex flex-col items-center justify-center p-4 bg-red-300">
-            <div className="overflow-hidden! w-screen px-20 h-full">
+            <div className="overflow-hidden! w-screen px-20 h-full flex flex-col">
                 {messages &&
                     messages?.length &&
                     messages.map((msg, i) => {
                         return (
-                            <div key={i}>{msg.role + " " + msg.content}</div>
+                            <div
+                                key={i}
+                                className={`bg-amber-100 rounded-sm p-2 max-w-6/10 ${msg.role === "user" ? "self-end" : "self-start"}`}
+                            >
+                                {msg.content}
+                            </div>
                         );
                     })}
             </div>
@@ -99,4 +110,4 @@ function ChatInterface() {
     );
 }
 
-export default ChatInterface;
+export default ChatInterface2;

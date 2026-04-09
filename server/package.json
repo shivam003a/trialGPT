@@ -17,6 +17,7 @@
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
     "openai": "^6.33.0",
+    "sarvamai": "^1.1.6",
     "zod": "^4.3.6"
   },
   "devDependencies": {
