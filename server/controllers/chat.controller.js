@@ -55,6 +55,11 @@ export const sendMessage = async (req, res) => {
 // POST /chat/message - Send a message
 export const sendMessageS = async (req, res) => {
     try {
+        const controller = new AbortController();
+        res.on("close", () => {
+            console.log(`FE Aborted`);
+            controller.abort();
+        });
         const result = chatSchema.safeParse(req.body);
 
         if (!result.success) {
@@ -81,9 +86,10 @@ export const sendMessageS = async (req, res) => {
             stream: true,
             reasoning_effort: null,
             wiki_grounding: true,
+            abortSignal: controller.signal,
         });
 
-        res.setHeader("Content-Type", "event-stream");
+        res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
 

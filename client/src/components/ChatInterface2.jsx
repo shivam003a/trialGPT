@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 function ChatInterface2() {
     const [messages, setMessages] = useState([]);
     const [query, setQuery] = useState("");
 
+    const abortRef = useRef(null);
+
     const sendMessages = async (e) => {
         e?.preventDefault();
+
+        const controller = new AbortController();
+        abortRef.current = controller;
 
         if (!query.trim()) return;
 
@@ -24,6 +29,7 @@ function ChatInterface2() {
                     body: JSON.stringify({
                         messages: newMessages,
                     }),
+                    signal: controller.signal,
                 },
             );
 
@@ -31,7 +37,6 @@ function ChatInterface2() {
 
             const reader = res.body.getReader();
             const decoder = new TextDecoder("utf-8");
-            let buffer = "";
 
             let i = 0;
 
@@ -48,7 +53,7 @@ function ChatInterface2() {
                     if (!line.startsWith("data: ")) continue;
 
                     const data = line.replace("data: ", "");
-                    if (data === "[DONE]") break;
+                    if (data === "[DONE]") return;
 
                     try {
                         const parsed = JSON.parse(data);
@@ -70,7 +75,17 @@ function ChatInterface2() {
                 }
             }
         } catch (e) {
-            console.log("Something Went Wrong", e);
+            if (e.name === "AbortError") {
+                console.log("Request aborted");
+            } else {
+                console.log("Something Went Wrong", e);
+            }
+        }
+    };
+
+    const abortRequest = () => {
+        if (abortRef.current) {
+            abortRef.current.abort();
         }
     };
 
@@ -91,7 +106,7 @@ function ChatInterface2() {
                     })}
             </div>
 
-            <form>
+            <form className="absolute left-1/2 bottom-0 -translate-x-1/2">
                 <input
                     type="text"
                     placeholder="Type your message here..."
@@ -104,6 +119,13 @@ function ChatInterface2() {
                     className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                     Send
+                </button>
+                <button
+                    type="button"
+                    onClick={abortRequest}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    Abort
                 </button>
             </form>
         </div>
