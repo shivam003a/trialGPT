@@ -1,4 +1,7 @@
 import { useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 function ChatInterface2() {
     const [messages, setMessages] = useState([]);
@@ -12,11 +15,11 @@ function ChatInterface2() {
         const controller = new AbortController();
         abortRef.current = controller;
 
+        setQuery("");
         if (!query.trim()) return;
 
         const newMessages = [...messages, { role: "user", content: query }];
         setMessages([...newMessages, { role: "assistant", content: "" }]);
-        setQuery("");
 
         try {
             const res = await fetch(
@@ -100,7 +103,12 @@ function ChatInterface2() {
                                 key={i}
                                 className={`bg-amber-100 rounded-sm p-2 max-w-6/10 ${msg.role === "user" ? "self-end" : "self-start"}`}
                             >
-                                {msg.content}
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeHighlight]}
+                                >
+                                    {msg.content}
+                                </ReactMarkdown>
                             </div>
                         );
                     })}
