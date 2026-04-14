@@ -50,6 +50,7 @@ function ChatInterface2() {
                 const chunk = decoder.decode(value, { stream: true });
 
                 const lines = chunk.split("\n");
+                console.log(lines);
 
                 for (let line of lines) {
                     line = line.trim();
@@ -60,6 +61,7 @@ function ChatInterface2() {
 
                     try {
                         const parsed = JSON.parse(data);
+                        console.log(parsed);
                         const text = parsed.content;
 
                         if (text) {

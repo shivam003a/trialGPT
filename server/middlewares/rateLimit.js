@@ -31,7 +31,7 @@ export const rateLimit = (type) => {
             res.setHeader("X-RateLimit-Reset", ttl > 0 ? ttl : 0);
 
             if (count > limit) {
-                setImmediate.setHeader("Retry-After", ttl > 0 ? ttl : 0);
+                res.setHeader("Retry-After", ttl > 0 ? ttl : 0);
 
                 return res.status(429).json({
                     success: false,
@@ -41,7 +41,7 @@ export const rateLimit = (type) => {
             }
 
             next();
-        } catch (e) {
+        } catch (err) {
             console.error("Rate limiter error:", err);
 
             // fail-open

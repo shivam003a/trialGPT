@@ -1,9 +1,6 @@
 import { createClient } from "redis";
-import dotenv from "dotenv";
 
-dotenv.config();
-
-const redis_url = process?.env?.REDIS_URL;
+const redis_url = process.env.REDIS_URL;
 if (!redis_url) {
     throw new Error("missing required environment vaiable REDIS_URL");
 }
@@ -12,14 +9,35 @@ const redis = createClient({
     url: redis_url,
 });
 
+// Event Listeners
 redis.on("connect", () => {
-    console.log("redis connected");
+    console.log("[Redis] Connected");
 });
 
-redis.on("error", (error) => {
-    console.log("redis client error", error);
+redis.on("reconnecting", () => {
+    console.log("[Redis] Reconnecting...");
 });
 
-await redis.connect();
+redis.on("error", (err) => {
+    console.log("[Redis] Error", err);
+});
+
+export const connectRedis = async () => {
+    try {
+        if (!redis.isOpen) {
+            await redis.connect();
+        }
+    } catch (err) {
+        console.error("[Redis] Connection failed:", err);
+        process.exit(1);
+    }
+};
+
+export const disconnectRedis = async () => {
+    if (redis.isOpen) {
+        await redis.quit();
+        console.log("[Redis] Disconnected");
+    }
+};
 
 export default redis;

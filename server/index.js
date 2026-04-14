@@ -1,38 +1,39 @@
-// Import necessary modules
-import express from "express";
+// Import ENV first
 import dotenv from "dotenv";
+dotenv.config();
+
+// Imports
+import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
 
 import responseHandler from "./middlewares/responseHandler.js";
 import chatRoutes from "./routes/chat.route.js";
-
-// Load environment variables and initialize Express app
-dotenv.config();
+import { connectRedis, disconnectRedis } from "./utils/redis.js";
 
 const app = express();
-const PORT = parseInt(process?.env?.PORT, 10) || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 app.set("trust proxy", true);
 
-// Configure middlewares
+// Global Middlewares
 app.use(helmet());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(
     cors({
-        origin: process?.env?.FE_URL || "http://localhost:5000",
+        origin: process.env.FE_URL || "http://localhost:5000",
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
         credentials: true,
     }),
 );
-app.use(morgan("short"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan("combined"));
 app.use(responseHandler);
 
-// Define routes
+// Routes
 app.get("/", (_, res) => {
-    return res.success(200, "welcome to the home route", null);
+    return res.success(200, "welcome to API", null);
 });
 
 app.use("/api/chat", chatRoutes);
@@ -43,6 +44,16 @@ app.use((req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
+    await connectRedis();
     console.log(`Server is running at http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+    console.log("Shutting down server...");
+    server.close(async () => {
+        await disconnectRedis();
+        process.exit(0);
+    });
 });
