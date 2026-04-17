@@ -10,7 +10,11 @@ import helmet from "helmet";
 
 import responseHandler from "./middlewares/responseHandler.js";
 import chatRoutes from "./routes/chat.route.js";
+import authRoutes from "./routes/auth.routes.js";
 import { connectRedis, disconnectRedis } from "./utils/redis.js";
+import connectDB from "./config/db.js";
+
+connectDB();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -36,6 +40,7 @@ app.get("/", (_, res) => {
     return res.success(200, "welcome to API", null);
 });
 
+app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
 // 404 Not Found handler
