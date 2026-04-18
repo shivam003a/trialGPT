@@ -4,9 +4,10 @@ import { createChatCompletions } from "../utils/openai.js";
 import { createChatCompletionBySarvam } from "../utils/sarvam.js";
 import { systemPrompt } from "../utils/contants.js";
 
-// POST /chat/message - Send a message
+// Stream response from OpenAI
 export const sendMessage = async (req, res) => {
     try {
+        // Validate request body
         const result = chatSchema.safeParse(req.body);
 
         if (!result.success) {
@@ -18,13 +19,16 @@ export const sendMessage = async (req, res) => {
             return res.error(400, "invalid input", errorMessages);
         }
 
+        // Extract messages
         const { messages } = result.data;
 
+        // Combine system prompt with user messages
         const combinedMessages = [
             { role: "system", content: "You are a helpful assistant." },
             ...messages,
         ];
 
+        // Get response from OpenAI
         const llmResponse = await createChatCompletions({
             model: "openai/gpt-oss-20b:free",
             messages: combinedMessages,
@@ -33,10 +37,12 @@ export const sendMessage = async (req, res) => {
             stream: true,
         });
 
+        // Set streaming headers
         res.setHeader("Content-Type", "event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
 
+        // Stream response chunks
         for await (const chunk of llmResponse) {
             const content = chunk?.choices?.[0]?.delta?.content;
 
@@ -44,6 +50,7 @@ export const sendMessage = async (req, res) => {
                 res.write(`data: ${JSON.stringify({ content })}\n\n`);
             }
         }
+        // End stream
         res.write(`data: [DONE]\n\n`);
         res.end();
     } catch (err) {
@@ -52,9 +59,10 @@ export const sendMessage = async (req, res) => {
     }
 };
 
-// POST /chat/message - Send a message
+// Stream response from Sarvam with abort signal
 export const sendMessageS = async (req, res) => {
     try {
+        // Create abort controller for cancellation
         const controller = new AbortController();
         res.on("close", () => {
             if (!res.writableEnded) {
@@ -62,6 +70,7 @@ export const sendMessageS = async (req, res) => {
             }
         });
 
+        // Validate request body
         const validation = chatSchema.safeParse(req.body);
 
         if (!validation.success) {
@@ -73,8 +82,10 @@ export const sendMessageS = async (req, res) => {
             return res.error(400, "invalid input", error);
         }
 
+        // Extract messages
         const { messages } = validation.data;
 
+        // Combine system prompt with user messages
         const combinedMessages = [
             {
                 role: "system",
@@ -83,6 +94,7 @@ export const sendMessageS = async (req, res) => {
             ...messages,
         ];
 
+        // Get response from Sarvam
         const llmResponse = await createChatCompletionBySarvam({
             model: "sarvam-105b",
             messages: combinedMessages,
@@ -94,11 +106,13 @@ export const sendMessageS = async (req, res) => {
             abortSignal: controller.signal,
         });
 
+        // Set streaming headers
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders?.();
 
+        // Setup heartbeat ping
         const heartbeat = setInterval(() => {
             if (!res.writableEnded) {
                 res.write(`: ping\n\n`);
@@ -106,6 +120,7 @@ export const sendMessageS = async (req, res) => {
         }, 15000);
 
         try {
+            // Stream response chunks
             for await (const chunk of llmResponse) {
                 if (res.writableEnded) break;
 
@@ -115,11 +130,13 @@ export const sendMessageS = async (req, res) => {
                 }
             }
 
+            // End stream
             if (!res.writableEnded) {
                 res.write(`data: [DONE]\n\n`);
                 res.end();
             }
         } catch (streamErr) {
+            // Handle abort error
             if (streamErr.name === "AbortError") return;
 
             console.log("streaming error: ", streamErr);
@@ -128,16 +145,18 @@ export const sendMessageS = async (req, res) => {
                 res.end();
             }
         } finally {
+            // Clear heartbeat
             clearInterval(heartbeat);
         }
     } catch (err) {
         console.error("Error processing message:", err);
 
+        // Handle abort error
         if (err.name === "AbortError") {
             console.log("gotcha yaa");
             return;
         }
-        // ✅ 2. If headers not sent → normal error
+        // Send error if headers not sent
         if (!res.headersSent) {
             return res.error(
                 err.statusCode || 500,

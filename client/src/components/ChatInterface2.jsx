@@ -32,6 +32,7 @@ function ChatInterface2() {
                     body: JSON.stringify({
                         messages: newMessages,
                     }),
+                    credentials: "include",
                     signal: controller.signal,
                 },
             );
@@ -95,8 +96,8 @@ function ChatInterface2() {
     };
 
     return (
-        <div className="overflow-hidden! w-screen flex flex-col items-center justify-center p-4 bg-red-300">
-            <div className="overflow-hidden! w-screen px-20 h-full flex flex-col">
+        <div className="overflow-hidden! w-full flex flex-col items-center justify-center p-4 bg-red-300">
+            <div className="overflow-hidden! w-full px-20 h-full flex flex-col">
                 {messages &&
                     messages?.length &&
                     messages.map((msg, i) => {

@@ -7,6 +7,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 
 import responseHandler from "./middlewares/responseHandler.js";
 import chatRoutes from "./routes/chat.route.js";
@@ -32,6 +33,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 app.use(morgan("combined"));
 app.use(responseHandler);
 
