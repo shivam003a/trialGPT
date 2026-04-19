@@ -1,8 +1,10 @@
 // Import necessary modules
-import { chatSchema } from "../zod/chat.schema.js";
+import { authenticateChatSchema, chatSchema } from "../zod/chat.schema.js";
 import { createChatCompletions } from "../utils/openai.js";
 import { createChatCompletionBySarvam } from "../utils/sarvam.js";
 import { systemPrompt } from "../utils/contants.js";
+import Chat from "../models/chats.schema.js";
+import Message from "../models/messages.schema.js";
 
 // Stream response from OpenAI
 export const sendMessage = async (req, res) => {
@@ -166,5 +168,127 @@ export const sendMessageS = async (req, res) => {
         if (!res.writableEnded) {
             res.end();
         }
+    }
+};
+
+export const sendAuthenticatedMessage = async (req, res) => {
+    try {
+        const validation = authenticateChatSchema.safeParse(req.body);
+
+        // SSE Headers
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        if (!validation.success) {
+            res.write(
+                `data: ${JSON.stringify({ type: "error", message: "invalid input" })}\n\n`,
+            );
+            return res.end();
+        }
+
+        const userId = req?.user?._id;
+        const { chatId, content } = validation.data;
+
+        // if !chatId, create new chat + generate title
+        let chat;
+        let isNewChat = false;
+
+        if (!chatId) {
+            chat = await Chat.create({
+                userId,
+                title: content.slice(0, 30),
+            });
+            isNewChat = true;
+        } else {
+            chat = await Chat.findOne({ _id: chatId, userId });
+
+            if (!chat) {
+                res.write(
+                    `data: ${JSON.stringify({ type: "error", message: "chat not found" })}\n\n`,
+                );
+                return res.end();
+            }
+        }
+
+        if (isNewChat) {
+            res.write(
+                `data: ${JSON.stringify({ type: "chat_created", chatId: chat._id })}\n\n`,
+            );
+        }
+
+        await Message.create({
+            chatId: chat?._id,
+            role: "user",
+            content,
+        });
+
+        // Fetch Context
+        const lastMessages = await Message.find({ chatId: chat?._id })
+            .sort({ createdAt: 1 })
+            .limit(20)
+            .lean();
+
+        // Convert to SarvamAI format
+        const messages = lastMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+        }));
+
+        // create empty assistnat message
+        const assistantMessage = await Message.create({
+            chatId: chat?._id,
+            role: "assistant",
+            content: "",
+            status: "pending",
+        });
+
+        let fullText = "";
+
+        const controller = new AbortController();
+
+        res.on("close", () => {
+            controller.abort();
+        });
+
+        // Get response from Sarvam
+        const stream = await createChatCompletionBySarvam({
+            model: "sarvam-105b",
+            messages,
+            temperature: 0.7,
+            max_tokens: 2000,
+            stream: true,
+            reasoning_effort: "low",
+            wiki_grounding: true,
+            abortSignal: controller.signal,
+        });
+
+        for await (let chunk of stream) {
+            const token = chunk.choices[0]?.delta?.content;
+
+            if (!token) continue;
+            fullText += token;
+
+            res.write(`data: ${JSON.stringify({ type: "token", token })}\n\n`);
+        }
+
+        assistantMessage.content = fullText;
+        assistantMessage.status = "completed";
+        await assistantMessage.save();
+
+        res.write(
+            `data: ${JSON.stringify({ type: "done", chatId: chat._id })}\n\n`,
+        );
+        return res.end();
+    } catch (err) {
+        console.error("Streaming error:", err);
+
+        res.write(
+            `data: ${JSON.stringify({
+                error: "streaming failed",
+            })}\n\n`,
+        );
+
+        res.end();
     }
 };

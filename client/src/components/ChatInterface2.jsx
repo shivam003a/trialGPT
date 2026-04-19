@@ -22,20 +22,17 @@ function ChatInterface2() {
         setMessages([...newMessages, { role: "assistant", content: "" }]);
 
         try {
-            const res = await fetch(
-                "http://localhost:5000/api/chat/message/s",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        messages: newMessages,
-                    }),
-                    credentials: "include",
-                    signal: controller.signal,
+            const res = await fetch("http://localhost:5000/api/chat/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
                 },
-            );
+                body: JSON.stringify({
+                    content: query,
+                }),
+                credentials: "include",
+                signal: controller.signal,
+            });
 
             let result = "";
 
@@ -51,19 +48,28 @@ function ChatInterface2() {
                 const chunk = decoder.decode(value, { stream: true });
 
                 const lines = chunk.split("\n");
-                console.log(lines);
 
                 for (let line of lines) {
                     line = line.trim();
                     if (!line.startsWith("data: ")) continue;
 
                     const data = line.replace("data: ", "");
-                    if (data === "[DONE]") return;
+                    console.log(data);
+
+                    if (data.type === "done") return;
 
                     try {
                         const parsed = JSON.parse(data);
-                        console.log(parsed);
-                        const text = parsed.content;
+                        const text = parsed.token;
+
+                        if (parsed.type == "chat_created") {
+                            console.log(data);
+                            window.history.replaceState(
+                                null,
+                                "",
+                                `/${parsed.chatId}`,
+                            );
+                        }
 
                         if (text) {
                             result += text;
@@ -116,6 +122,15 @@ function ChatInterface2() {
                         );
                     })}
             </div>
+
+            <button
+                onClick={() =>
+                    (window.location.href =
+                        "http://localhost:5000/api/auth/google")
+                }
+            >
+                Google
+            </button>
 
             <form className="absolute left-1/2 bottom-0 -translate-x-1/2">
                 <input

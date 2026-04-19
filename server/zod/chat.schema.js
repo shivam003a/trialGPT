@@ -29,3 +29,14 @@ export const chatSchema = z
             ),
     })
     .strict();
+
+export const authenticateChatSchema = z.object({
+    content: z
+        .string({ required_error: "query is required" })
+        .trim()
+        .min(1, "query cannot be empty"),
+    chatId: z
+        .string()
+        .regex(/^[0-9a-fA-F]{24}$/, "invalid chatId")
+        .optional(),
+});
