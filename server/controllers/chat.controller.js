@@ -292,3 +292,49 @@ export const sendAuthenticatedMessage = async (req, res) => {
         res.end();
     }
 };
+
+export const getAllChats = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+
+        page = Math.max(1, page);
+        limit = Math.max(1, Math.min(limit, 20));
+
+        const skip = (page - 1) * limit;
+
+        const chats = await Chat.find({ userId })
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit + 1)
+            .select("_id title updatedAt")
+            .lean();
+
+        const hasMore = chats.length > limit;
+        if (hasMore) chats.pop();
+
+        return res.success(200, "fetched chats", {
+            chats,
+            pagination: {
+                page,
+                hasMore,
+            },
+        });
+    } catch (err) {
+        console.error("Error getting all chats", err);
+
+        // will update error handling later, for now leave it as it is
+        return res.error(500, "Error getting chats");
+    }
+};
+
+// export const getChatById = async (req, res) => {
+//     try {
+//         const userId = req.user._id;
+//         const { chatId } = req.param;
+
+//         const
+//     } catch (err) {}
+// };

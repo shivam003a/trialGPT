@@ -1,6 +1,7 @@
 // Import necessary modules
 import express from "express";
 import {
+    getAllChats,
     sendAuthenticatedMessage,
     sendMessage,
     sendMessageS,
@@ -15,5 +16,6 @@ const router = express.Router();
 router.post("/message", authenticateRequest, sendMessage);
 router.post("/message/s", authenticateRequest, rateLimit("chat"), sendMessageS);
 router.post("/chat", authenticateRequest, sendAuthenticatedMessage);
+router.get("/chats", authenticateRequest, getAllChats);
 
 export default router;
